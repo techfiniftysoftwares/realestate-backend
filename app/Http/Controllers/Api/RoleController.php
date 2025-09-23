@@ -18,41 +18,53 @@ use Illuminate\Support\Facades\Auth;
 
 class RoleController extends Controller
 {
-    public function index()
-    {
-        try {
-            $user = Auth::user();
+   public function index()
+{
+    try {
+        $user = Auth::user();
 
-            // Base query with counts
-            $query = Role::withCount(['users', 'permissions']);
+        // Base query with counts and eager loading
+        $query = Role::withCount(['users', 'permissions'])
+                    ->with(['permissions.module', 'permissions.submodule']);
 
-            // If user is not super admin (role_id !== 1), exclude super admin role
-            if ($user->role_id !== 1) {
-                $query->where('id', '!=', 1);
-            }
-
-            $roles = $query->get();
-
-            $roles = $roles->map(function ($role) {
-                $modules = $role->permissions->pluck('module.id')->unique();
-                $submodules = $role->permissions->pluck('submodule.id')->unique();
-
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'users_count' => $role->users_count,
-                    'permissions_count' => $role->permissions_count,
-                    'modules_count' => $modules->count(),
-                    'submodules_count' => $submodules->count(),
-                ];
-            });
-
-            return successResponse('Roles retrieved successfully', $roles);
-        } catch (\Exception $e) {
-            return serverErrorResponse('Failed to retrieve roles', $e->getMessage());
+        // If user is not super admin (role_id !== 1), exclude super admin role
+        if ($user && $user->role_id !== 1) {
+            $query->where('id', '!=', 1);
         }
-    }
 
+        $roles = $query->get();
+
+        $roles = $roles->map(function ($role) {
+            // Safe access with null checks
+            $permissions = $role->permissions ?? collect();
+
+            $modules = $permissions->filter(function($permission) {
+                return $permission->module !== null;
+            })->pluck('module.id')->unique();
+
+            $submodules = $permissions->filter(function($permission) {
+                return $permission->submodule !== null;
+            })->pluck('submodule.id')->unique();
+
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'users_count' => $role->users_count ?? 0,
+                'permissions_count' => $role->permissions_count ?? 0,
+                'modules_count' => $modules->count(),
+                'submodules_count' => $submodules->count(),
+            ];
+        });
+
+        return successResponse('Roles retrieved successfully', $roles);
+    } catch (\Exception $e) {
+        Log::error('Error in RoleController::index', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return serverErrorResponse('Failed to retrieve roles', $e->getMessage());
+    }
+}
     public function store(Request $request)
     {
         $validatedData = $request->validate([
