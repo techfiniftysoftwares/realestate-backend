@@ -25,7 +25,9 @@ class UserController extends Controller
 
             // Validate sort field to prevent SQL injection
             $allowedSortFields = [
-                'name',
+                'first_name',
+                'last_name',
+                'username',
                 'email',
                 'phone',
                 'created_at',
@@ -120,7 +122,9 @@ class UserController extends Controller
         if (!empty($filters['search'])) {
             $searchTerm = $filters['search'];
             $query->where(function ($query) use ($searchTerm) {
-                $query->where('name', 'like', "%{$searchTerm}%")
+                $query->where('first_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('last_name', 'like', "%{$searchTerm}%")
+                    ->orWhere('username', 'like', "%{$searchTerm}%")
                     ->orWhere('email', 'like', "%{$searchTerm}%")
                     ->orWhere('phone', 'like', "%{$searchTerm}%");
             });
@@ -149,7 +153,10 @@ class UserController extends Controller
     {
         return [
             'id' => $user->id,
-            'name' => $user->name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'username' => $user->username,
+            'full_name' => trim($user->first_name . ' ' . $user->last_name),
             'email' => $user->email,
             'phone' => $user->phone,
             'is_active' => $user->is_active,
@@ -171,7 +178,10 @@ class UserController extends Controller
 
             $userData = [
                 'id' => $user->id,
-                'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'username' => $user->username,
+                'full_name' => trim($user->first_name . ' ' . $user->last_name),
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
@@ -224,7 +234,10 @@ class UserController extends Controller
                 // Create user data array
                 $userData = [
                     'id' => $user->id,
-                    'name' => $user->name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'username' => $user->username,
+                    'full_name' => trim($user->first_name . ' ' . $user->last_name),
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'is_active' => $user->is_active,
@@ -238,7 +251,10 @@ class UserController extends Controller
 
             return successResponse('User profile retrieved successfully', [
                 'id' => $user->id,
-                'name' => $user->name,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'username' => $user->username,
+                'full_name' => trim($user->first_name . ' ' . $user->last_name),
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
@@ -259,7 +275,9 @@ class UserController extends Controller
         try {
             $user = $request->user();
             $validatedData = $request->validate([
-                'name' => 'sometimes|string|max:255',
+                'first_name' => 'sometimes|string|max:255',
+                'last_name' => 'sometimes|string|max:255',
+                'username' => 'sometimes|string|max:255|unique:users,username,' . $user->id,
                 'email' => 'sometimes|string|email|unique:users,email,' . $user->id,
                 'phone' => 'sometimes|string|max:20',
                 'password' => 'sometimes|string|min:8',
@@ -291,7 +309,9 @@ class UserController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'name' => 'sometimes|string|max:255',
+                'first_name' => 'sometimes|string|max:255',
+                'last_name' => 'sometimes|string|max:255',
+                'username' => 'sometimes|string|max:255|unique:users,username,' . $user->id,
                 'email' => 'sometimes|string|email|unique:users,email,' . $user->id,
                 'phone' => 'sometimes|string|max:20',
                 'role_id' => 'sometimes|exists:roles,id',

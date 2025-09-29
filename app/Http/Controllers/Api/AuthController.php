@@ -28,8 +28,8 @@ class AuthController extends Controller
             return validationErrorResponse($validator->errors());
         }
 
-        // Determine if identifier is email or name/username
-        $field = filter_var($request->identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+        // Determine if identifier is email or username/userusername
+        $field = filter_var($request->identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
         $user = User::where($field, $request->identifier)->first();
 
@@ -145,7 +145,7 @@ class AuthController extends Controller
     //         if (!empty($user->phone)) {
     //             $smsData = [
     //                 'user_id' => $user->id,
-    //                 'user_name' => $user->name,
+    //                 'user_username' => $user->username,
     //                 'phone_number' => $user->phone,
     //                 'otp_code' => $otpCode
     //             ];
@@ -170,7 +170,7 @@ class AuthController extends Controller
         try {
             // Validate incoming request data
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
+                'username' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
                 'phone' => 'nullable|string|max:20',
                 'role_id' => 'required|exists:roles,id',
@@ -188,7 +188,7 @@ class AuthController extends Controller
 
             // Create a new user record
             $user = new User();
-            $user->name = $request->input('name');
+            $user->username = $request->input('username');
             $user->email = $request->input('email');
             $user->password = Hash::make($password);
             $user->phone = $request->input('phone');
@@ -224,7 +224,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         $validator = Validator::make($request->all(), [
-            'name' => 'nullable|string|max:255',
+            'username' => 'nullable|string|max:255',
             'email' => 'nullable|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:8|confirmed'
@@ -236,7 +236,7 @@ class AuthController extends Controller
 
         try {
             $updateData = collect($request->only([
-                'name',
+                'username',
                 'email',
                 'phone'
             ]))->filter()->toArray();
@@ -308,7 +308,7 @@ class AuthController extends Controller
             if (!empty($user->phone)) {
                 $smsData = [
                     'user_id' => $user->id,
-                    'user_name' => $user->name,
+                    'user_username' => $user->username,
                     'phone_number' => $user->phone,
                     'reset_code' => $resetCode
                 ];
