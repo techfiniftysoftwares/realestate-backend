@@ -15,9 +15,22 @@ class ContactSubmission extends Model
         'phone',
         'subject',
         'message',
+        'preferred_contact',
+        'property_type_id',
         'status',
         'ip_address'
     ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    // Relationships
+    public function propertyType()
+    {
+        return $this->belongsTo(PropertyType::class);
+    }
 
     // Scopes
     public function scopeNew($query)

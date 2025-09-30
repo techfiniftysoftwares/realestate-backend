@@ -1,4 +1,5 @@
 <?php
+
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
@@ -14,6 +15,10 @@ use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\GeneralController;
 
+
+use App\Http\Controllers\Api\FavoriteController;
+use App\Http\Controllers\Api\FilterController;
+use App\Http\Controllers\Api\PropertyTypeController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -22,7 +27,11 @@ use App\Http\Controllers\Api\GeneralController;
 
 // Public authentication routes
 Route::prefix('auth')->group(function () {
+
+    Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/password/request', [AuthController::class, 'requestPasswordReset']);
+    Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 });
 
 // Protected routes (require Passport authentication)
@@ -55,14 +64,52 @@ Route::middleware(['auth:api'])->group(function () {
     Route::post('submodules', [ModuleController::class, 'storeSubmodule']);
     Route::get('submodules', [ModuleController::class, 'getSubmodules']);
 
-    // Properties management (Admin)
-    Route::get('properties', [PropertyController::class, 'adminIndex']);
-    Route::post('properties', [PropertyController::class, 'store']);
-    Route::get('properties/{property}', [PropertyController::class, 'adminShow']);
-    Route::put('properties/{property}', [PropertyController::class, 'update']);
-    Route::delete('properties/{property}', [PropertyController::class, 'destroy']);
-    Route::post('properties/{property}/toggle-featured', [PropertyController::class, 'toggleFeatured']);
-    Route::post('properties/bulk-update-status', [PropertyController::class, 'bulkUpdateStatus']);
+
+
+
+
+
+    // Property Management (Admin/Agent)
+    Route::prefix('properties')->group(function () {
+        Route::post('/', [PropertyController::class, 'store']);
+        Route::put('/{id}', [PropertyController::class, 'update']);
+        Route::delete('/{id}', [PropertyController::class, 'destroy']);
+    });
+
+    // Favorites Routes
+    Route::prefix('favorites')->group(function () {
+        Route::get('/', [FavoriteController::class, 'index']); // Get all favorites
+        Route::post('/', [FavoriteController::class, 'store']); // Add to favorites
+        Route::post('/toggle', [FavoriteController::class, 'toggle']); // Toggle favorite
+        Route::delete('/{propertyId}', [FavoriteController::class, 'destroy']); // Remove from favorites
+        Route::get('/check/{propertyId}', [FavoriteController::class, 'check']); // Check if favorited
+        Route::get('/count', [FavoriteController::class, 'count']); // Get count
+        Route::delete('/', [FavoriteController::class, 'clear']); // Clear all
+    });
+
+
+    Route::prefix('contact-submissions')->group(function () {
+        Route::get('/', [ContactSubmissionController::class, 'index']);
+        Route::get('/{contactSubmission}', [ContactSubmissionController::class, 'show']);
+        Route::put('/{contactSubmission}', [ContactSubmissionController::class, 'update']);
+        Route::delete('/{contactSubmission}', [ContactSubmissionController::class, 'destroy']);
+    });
+
+    Route::post('/property-types', [PropertyTypeController::class, 'store']);
+    Route::put('/property-types/{id}', [PropertyTypeController::class, 'update']);
+    Route::delete('/property-types/{id}', [PropertyTypeController::class, 'destroy']);
+    Route::patch('/property-types/{id}/toggle', [PropertyTypeController::class, 'toggleActive']);
+    Route::post('/property-types/reorder', [PropertyTypeController::class, 'reorder']);
+
+
+
+
+
+
+
+
+
+
 
     // Property inquiries management (Admin)
     Route::get('property-inquiries', [PropertyInquiryController::class, 'index']);
@@ -81,8 +128,11 @@ Route::middleware(['auth:api'])->group(function () {
     Route::put('blog/{blog}', [BlogController::class, 'update']);
     Route::delete('blog/{blog}', [BlogController::class, 'destroy']);
 
-    // Contact submissions management (Admin)
-    Route::apiResource('contact-submissions', ContactSubmissionController::class);
+
+
+
+
+
 
     // Newsletter management (Admin)
     Route::get('newsletter-subscribers', [NewsletterController::class, 'index']);
@@ -94,31 +144,59 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('analytics/top-properties', [AnalyticsController::class, 'topProperties']);
 });
 
+
+
+
+
+
+// Public contact route (no auth required)
+Route::post('/contact-submissions', [ContactSubmissionController::class, 'store']);
+
+
+
+// Public property types (no auth required)
+Route::get('/property-types', [PropertyTypeController::class, 'index']);
+Route::get('/property-types/{id}', [PropertyTypeController::class, 'show']);
+
+
+
+
 // Public routes (no authentication required)
-Route::prefix('public')->group(function () {
 
-    // Properties (Public)
-    Route::get('properties', [PropertyController::class, 'index']);
-    Route::get('properties/featured', [PropertyController::class, 'featured']);
-    Route::get('properties/search', [PropertyController::class, 'search']);
-    Route::get('properties/{slug}', [PropertyController::class, 'show']);
+// Blog (Public)
+Route::get('blog', [BlogController::class, 'index']);
+Route::get('blog/recent', [BlogController::class, 'recent']);
+Route::get('blog/{slug}', [BlogController::class, 'show']);
 
-    // Blog (Public)
-    Route::get('blog', [BlogController::class, 'index']);
-    Route::get('blog/recent', [BlogController::class, 'recent']);
-    Route::get('blog/{slug}', [BlogController::class, 'show']);
+// Contact and submissions (Public)
+Route::post('contact', [ContactController::class, 'submitContactForm']);
+Route::post('property-inquiry', [ContactController::class, 'submitPropertyInquiry']);
+Route::post('newsletter/subscribe', [ContactController::class, 'subscribeNewsletter']);
+Route::post('newsletter/unsubscribe', [ContactController::class, 'unsubscribeNewsletter']);
 
-    // Contact and submissions (Public)
-    Route::post('contact', [ContactController::class, 'submitContactForm']);
-    Route::post('property-inquiry', [ContactController::class, 'submitPropertyInquiry']);
-    Route::post('newsletter/subscribe', [ContactController::class, 'subscribeNewsletter']);
-    Route::post('newsletter/unsubscribe', [ContactController::class, 'unsubscribeNewsletter']);
+// Property inquiry availability check (Public)
+Route::get('properties/{propertyId}/inquiry-availability', [PropertyInquiryController::class, 'checkAvailability']);
 
-    // Property inquiry availability check (Public)
-    Route::get('properties/{propertyId}/inquiry-availability', [PropertyInquiryController::class, 'checkAvailability']);
+// General pages (Public)
+Route::get('homepage', [GeneralController::class, 'homepage']);
+Route::get('about', [GeneralController::class, 'aboutPage']);
+Route::get('search-suggestions', [GeneralController::class, 'searchSuggestions']);
 
-    // General pages (Public)
-    Route::get('homepage', [GeneralController::class, 'homepage']);
-    Route::get('about', [GeneralController::class, 'aboutPage']);
-    Route::get('search-suggestions', [GeneralController::class, 'searchSuggestions']);
+
+// Public Property Routes
+Route::prefix('properties')->group(function () {
+    Route::get('/', [PropertyController::class, 'index']); // List with filters
+    Route::get('/featured', [PropertyController::class, 'featured']); // Featured properties
+    Route::get('/best-deals', [PropertyController::class, 'bestDeals']); // Best deals
+    Route::get('/{slug}', [PropertyController::class, 'show']); // Single property
+});
+
+// Filter Options Routes (for dropdown data)
+Route::prefix('filters')->group(function () {
+    Route::get('/all', [FilterController::class, 'getAllFilters']); // Get all in one request
+    Route::get('/types', [FilterController::class, 'getPropertyTypes']);
+    Route::get('/locations', [FilterController::class, 'getLocations']);
+    Route::get('/use-categories', [FilterController::class, 'getUseCategories']);
+    Route::get('/styles', [FilterController::class, 'getStyles']);
+    Route::get('/amenities', [FilterController::class, 'getAmenities']);
 });

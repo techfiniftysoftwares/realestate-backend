@@ -62,109 +62,6 @@ class AuthController extends Controller
         return errorResponse('Invalid credentials', 401);
     }
 
-    // public function verifyOTP(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'user_id' => 'required|exists:users,id',
-    //         'otp_code' => 'required|string|size:6',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return validationErrorResponse($validator->errors());
-    //     }
-
-    //     try {
-    //         $userId = $request->input('user_id');
-    //         $inputOTP = $request->input('otp_code');
-
-    //         // Get stored OTP from cache
-    //         $storedOTP = Cache::get("otp_{$userId}");
-
-    //         if (!$storedOTP) {
-    //             return errorResponse('OTP has expired. Please login again.', 400);
-    //         }
-
-    //         if ($storedOTP !== $inputOTP) {
-    //             return errorResponse('Invalid OTP code.', 400);
-    //         }
-
-    //         // OTP is valid, create access token
-    //         $user = User::find($userId);
-    //         $accessToken = $user->createToken('Api-Access')->accessToken;
-
-    //         // Update last successful login
-    //         $user->update(['last_login_at' => now()]);
-
-    //         // Clear OTP from cache
-    //         Cache::forget("otp_{$userId}");
-
-    //         return successResponse('Login successful', [
-    //             'token' => $accessToken,
-    //             'user' => $user
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         Log::error('OTP verification failed', [
-    //             'user_id' => $request->input('user_id'),
-    //             'error' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString()
-    //         ]);
-
-    //         return serverErrorResponse('OTP verification failed', $e->getMessage());
-    //     }
-    // }
-
-    // public function resendOTP(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'user_id' => 'required|exists:users,id',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return validationErrorResponse($validator->errors());
-    //     }
-
-    //     try {
-    //         $userId = $request->input('user_id');
-    //         $user = User::find($userId);
-
-    //         // Check if user is still active
-    //         if (!$user->is_active) {
-    //             return errorResponse('User account is inactive', 403);
-    //         }
-
-    //         // Generate new OTP
-    //         $otpCode = $this->generateOTP();
-
-    //         // Store new OTP in cache with 5-minute expiration
-    //         Cache::put("otp_{$user->id}", $otpCode, now()->addMinutes(5));
-
-    //         // Send OTP email using notification system (isResend = true)
-    //         \App\Jobs\SendOTPNotification::dispatch($user, $otpCode, true);
-
-    //         // Send OTP SMS notification if user has phone number
-    //         if (!empty($user->phone)) {
-    //             $smsData = [
-    //                 'user_id' => $user->id,
-    //                 'user_username' => $user->username,
-    //                 'phone_number' => $user->phone,
-    //                 'otp_code' => $otpCode
-    //             ];
-
-    //             SendAuthSMSNotificationJob::dispatch('otp_resend', $smsData);
-    //         }
-
-    //         return successResponse('New OTP sent to your email and SMS.');
-    //     } catch (\Exception $e) {
-    //         Log::error('Failed to resend OTP', [
-    //             'user_id' => $request->input('user_id'),
-    //             'error' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString()
-    //         ]);
-
-    //         return serverErrorResponse('Failed to resend OTP', $e->getMessage());
-    //     }
-    // }
-
     public function signup(Request $request)
     {
         try {
@@ -414,4 +311,81 @@ class AuthController extends Controller
     {
         return str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
+
+
+
+
+
+
+
+
+
+
+
+    /**
+ * Public user registration (for browsing users)
+ */
+public function register(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'first_name' => 'required|string|max:255',
+        'last_name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'phone' => 'nullable|string|max:20',
+        'password' => 'required|string|min:8|confirmed',
+    ]);
+
+    if ($validator->fails()) {
+        return validationErrorResponse($validator->errors());
+    }
+
+    try {
+        // Create username from email
+        $username = explode('@', $request->email)[0] . rand(100, 999);
+
+        $user = User::create([
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'username' => $username,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
+            'role_id' => 2, // Regular user role
+            'is_active' => true,
+        ]);
+
+        // Auto-login after registration
+        $token = $user->createToken('Api-Access')->plainTextToken;
+
+        return createdResponse([
+            'token' => $token,
+            'user' => $user->load('role')
+        ], 'Registration successful');
+
+    } catch (\Exception $e) {
+        Log::error('Failed to register user', [
+            'error' => $e->getMessage(),
+            'request' => $request->except(['password'])
+        ]);
+
+        return serverErrorResponse('Failed to register user', $e->getMessage());
+    }
+}
+
+/**
+ * Get authenticated user profile
+ */
+public function me(Request $request)
+{
+    try {
+        $user = $request->user()->load('role');
+
+        return successResponse('User profile retrieved', [
+            'user' => $user,
+            'favorites_count' => $user->getFavoritesCount()
+        ]);
+    } catch (\Exception $e) {
+        return serverErrorResponse('Failed to get user profile', $e->getMessage());
+    }
+}
 }

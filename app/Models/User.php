@@ -56,4 +56,56 @@ class User extends Authenticatable implements OAuthenticatable
             ->exists();
     }
 
+
+
+
+
+
+
+
+
+
+
+    /**
+     * Get all favorites for this user
+     */
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    /**
+     * Get all favorited properties (many-to-many)
+     */
+    public function favoritedProperties()
+    {
+        return $this->belongsToMany(Property::class, 'favorites')
+            ->withTimestamps()
+            ->orderBy('favorites.created_at', 'desc');
+    }
+
+    /**
+     * Get properties listed by this user (if agent)
+     */
+    public function listedProperties()
+    {
+        return $this->hasMany(Property::class, 'agent_id');
+    }
+
+    /**
+     * Check if user has favorited a property
+     */
+    public function hasFavorited($propertyId)
+    {
+        return $this->favorites()->where('property_id', $propertyId)->exists();
+    }
+
+    /**
+     * Get count of user's favorites
+     */
+    public function getFavoritesCount()
+    {
+        return $this->favorites()->count();
+    }
+
 }

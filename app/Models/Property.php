@@ -2,173 +2,130 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Illuminate\Support\Str;
 
 class Property extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'title',
         'description',
-        'type',
+        'slug',
+        'property_type_id',
+        'location_id',
+        'property_use_category_id',
+        'property_style_id',
         'status',
         'listing_type',
         'price',
         'currency',
-        'address',
-        'city',
-        'county',
-        'country',
-        'latitude',
-        'longitude',
         'bedrooms',
         'bathrooms',
-        'square_footage',
+        'area',
         'lot_size',
         'year_built',
-        'parking_spaces',
-        'amenities',
-        'features',
-        'virtual_tour_url',
-        'slug',
+        'garage_spaces',
+        'neighborhood_ratings',
         'is_featured',
-        'view_count'
+        'is_best_deal',
+        'virtual_tour_url',
+        'view_count',
+        'meta_description',
+        'meta_keywords',
+        'agent_id',
     ];
 
     protected $casts = [
-        'amenities' => 'array',
-        'features' => 'array',
+        'neighborhood_ratings' => 'array',
+        'meta_keywords' => 'array',
         'is_featured' => 'boolean',
+        'is_best_deal' => 'boolean',
         'price' => 'decimal:2',
-        'square_footage' => 'decimal:2',
+        'area' => 'decimal:2',
         'lot_size' => 'decimal:2',
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8'
+        'view_count' => 'integer',
     ];
 
-    // Media Collections
+    protected $appends = ['formatted_price'];
+
+    // Media Library Collections
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('images')
+        $this->addMediaCollection('property_images')
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
-            ->singleFile(false);
+            ->useDisk('public');
 
         $this->addMediaCollection('featured_image')
-            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
-            ->singleFile(true);
+            ->singleFile()
+            ->useDisk('public');
 
         $this->addMediaCollection('documents')
-            ->acceptsMimeTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'])
-            ->singleFile(false);
-
-        $this->addMediaCollection('floor_plans')
-            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'application/pdf'])
-            ->singleFile(false);
-    }
-
-    public function registerMediaConversions(Media $media = null): void
-    {
-        $this->addMediaConversion('thumb')
-            ->width(300)
-            ->height(300)
-            ->sharpen(10)
-            ->performOnCollections('images', 'featured_image');
-
-        $this->addMediaConversion('medium')
-            ->width(600)
-            ->height(400)
-            ->sharpen(10)
-            ->performOnCollections('images', 'featured_image');
-
-        $this->addMediaConversion('large')
-            ->width(1200)
-            ->height(800)
-            ->sharpen(10)
-            ->performOnCollections('images', 'featured_image');
+            ->acceptsMimeTypes(['application/pdf'])
+            ->useDisk('public');
     }
 
     // Relationships
-    public function inquiries()
+    public function propertyType()
     {
-        return $this->hasMany(PropertyInquiry::class);
+        return $this->belongsTo(PropertyType::class);
     }
 
-    public function views()
+    public function location()
     {
-        return $this->hasMany(PropertyView::class);
+        return $this->belongsTo(Location::class);
     }
 
-    // Accessors
-    public function getFormattedPriceAttribute()
+    public function propertyUseCategory()
     {
-        return number_format($this->price, 0) . ' ' . $this->currency;
+        return $this->belongsTo(PropertyUseCategory::class);
     }
 
-    public function getFeaturedImageUrlAttribute()
+    public function propertyStyle()
     {
-        $featuredImage = $this->getFirstMedia('featured_image');
-        return $featuredImage ? $featuredImage->getUrl('medium') : null;
+        return $this->belongsTo(PropertyStyle::class);
     }
 
-    public function getImageGalleryAttribute()
+    public function amenities()
     {
-        return $this->getMedia('images')->map(function ($media) {
-            return [
-                'id' => $media->id,
-                'name' => $media->name,
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-                'large' => $media->getUrl('large'),
-                'original' => $media->getUrl(),
-            ];
-        });
+        return $this->belongsToMany(Amenity::class, 'amenity_property');
     }
 
-    public function getDocumentsAttribute()
+    public function agent()
     {
-        return $this->getMedia('documents')->map(function ($media) {
-            return [
-                'id' => $media->id,
-                'name' => $media->name,
-                'file_name' => $media->file_name,
-                'mime_type' => $media->mime_type,
-                'size' => $media->size,
-                'url' => $media->getUrl(),
-            ];
-        });
+        return $this->belongsTo(User::class, 'agent_id');
     }
 
-    public function getFloorPlansAttribute()
+    public function favorites()
     {
-        return $this->getMedia('floor_plans')->map(function ($media) {
-            return [
-                'id' => $media->id,
-                'name' => $media->name,
-                'file_name' => $media->file_name,
-                'mime_type' => $media->mime_type,
-                'url' => $media->getUrl(),
-                'thumb' => $media->mime_type === 'application/pdf' ? null : $media->getUrl('thumb'),
-            ];
-        });
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function favoritedByUsers()
+    {
+        return $this->belongsToMany(User::class, 'favorites')
+            ->withTimestamps();
     }
 
     // Scopes
-    public function scopeActive($query)
+    public function scopeAvailable($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('status', 'available');
     }
 
     public function scopeFeatured($query)
     {
         return $query->where('is_featured', true);
+    }
+
+    public function scopeBestDeals($query)
+    {
+        return $query->where('is_best_deal', true);
     }
 
     public function scopeForSale($query)
@@ -181,40 +138,100 @@ class Property extends Model implements HasMedia
         return $query->where('listing_type', 'rent');
     }
 
-    // Methods
+    public function scopeByType($query, $typeId)
+    {
+        if ($typeId && $typeId !== 'all') {
+            return $query->where('property_type_id', $typeId);
+        }
+        return $query;
+    }
+
+    public function scopeByLocation($query, $locationId)
+    {
+        if ($locationId) {
+            return $query->where('location_id', $locationId);
+        }
+        return $query;
+    }
+
+    public function scopePriceRange($query, $minPrice, $maxPrice)
+    {
+        return $query->whereBetween('price', [$minPrice, $maxPrice]);
+    }
+
+    public function scopeMinBedrooms($query, $bedrooms)
+    {
+        if ($bedrooms && $bedrooms !== 'any') {
+            if ($bedrooms === '4+') {
+                return $query->where('bedrooms', '>=', 4);
+            }
+            return $query->where('bedrooms', '>=', (int)$bedrooms);
+        }
+        return $query;
+    }
+
+    public function scopeMinBathrooms($query, $bathrooms)
+    {
+        if ($bathrooms && $bathrooms !== 'any') {
+            if ($bathrooms === '3+') {
+                return $query->where('bathrooms', '>=', 3);
+            }
+            return $query->where('bathrooms', '>=', (int)$bathrooms);
+        }
+        return $query;
+    }
+
+    public function scopeSearch($query, $searchTerm)
+    {
+        if ($searchTerm) {
+            return $query->where(function ($q) use ($searchTerm) {
+                $q->where('title', 'like', "%{$searchTerm}%")
+                    ->orWhere('description', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('location', function ($locationQuery) use ($searchTerm) {
+                        $locationQuery->where('name', 'like', "%{$searchTerm}%")
+                            ->orWhere('city', 'like', "%{$searchTerm}%");
+                    });
+            });
+        }
+        return $query;
+    }
+
+    // Accessors
+    public function getFormattedPriceAttribute()
+    {
+        return number_format($this->price, 0, '.', ',');
+    }
+
+    // Mutators
+    public function setTitleAttribute($value)
+    {
+        $this->attributes['title'] = $value;
+        $this->attributes['slug'] = Str::slug($value) . '-' . Str::random(6);
+    }
+
+    // Helper Methods
     public function incrementViewCount()
     {
         $this->increment('view_count');
     }
 
-    public function trackView($request)
+    public function isFavoritedBy($userId)
     {
-        // Avoid counting multiple views from same IP within an hour
-        $recentView = $this->views()
-                          ->where('ip_address', $request->ip())
-                          ->where('viewed_at', '>', now()->subHour())
-                          ->first();
-
-        if (!$recentView) {
-            $this->views()->create([
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'referrer' => $request->header('referer'),
-                'viewed_at' => now()
-            ]);
-
-            $this->incrementViewCount();
-        }
+        return $this->favorites()->where('user_id', $userId)->exists();
     }
 
-    protected static function boot()
+    public function getImageUrls()
     {
-        parent::boot();
+        return $this->getMedia('property_images')->map(function ($media) {
+            return $media->getUrl();
+        })->toArray();
+    }
 
-        static::creating(function ($property) {
-            if (empty($property->slug)) {
-                $property->slug = Str::slug($property->title);
-            }
-        });
+
+
+    public function getFeaturedImageUrl()
+    {
+        $media = $this->getFirstMedia('featured_image');
+        return $media ? $media->getUrl() : null;
     }
 }
